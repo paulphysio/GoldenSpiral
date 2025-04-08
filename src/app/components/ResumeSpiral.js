@@ -16,6 +16,7 @@ const ResumeSpiral = () => {
   const scrollOffsetRef = useRef(0);
   const animationFrameRef = useRef(null);
   const isAnimatingRef = useRef(false);
+  const touchStartYRef = useRef(null);
   const spiralWidth = 6.3;
   const spiralHeight = 3.9;
   const cycleLength = 7;
@@ -177,17 +178,47 @@ const ResumeSpiral = () => {
     animationFrameRef.current = requestAnimationFrame(animate);
   };
 
-  const handleScroll = (event) => {
+  const handleWheel = (event) => {
     event.preventDefault();
     const direction = event.deltaY > 0 ? 'down' : 'up';
     animateRotation(direction);
+  };
+
+  const handleTouchStart = (event) => {
+    event.preventDefault();
+    touchStartYRef.current = event.touches[0].clientY;
+  };
+
+  const handleTouchMove = (event) => {
+    event.preventDefault();
+    if (touchStartYRef.current === null) return;
+
+    const touchEndY = event.touches[0].clientY;
+    const deltaY = touchStartYRef.current - touchEndY;
+
+    // Threshold to trigger rotation (e.g., 50px swipe)
+    if (Math.abs(deltaY) > 50) {
+      const direction = deltaY > 0 ? 'down' : 'up';
+      animateRotation(direction);
+      touchStartYRef.current = null; // Reset to prevent multiple triggers
+    }
+  };
+
+  const handleTouchEnd = (event) => {
+    event.preventDefault();
+    touchStartYRef.current = null;
   };
 
   useEffect(() => {
     drawSpiral(0);
     drawSpiral(0, true);
     overlayRef.current.classList.add('visible', 'glitch', 'fade-in', 'glow');
-    window.addEventListener('wheel', handleScroll, { passive: false });
+
+    const container = canvasRef.current.parentElement;
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: false });
 
     const resizeHandler = () => {
       drawSpiral(scrollOffsetRef.current);
@@ -196,14 +227,17 @@ const ResumeSpiral = () => {
     window.addEventListener('resize', resizeHandler);
 
     return () => {
-      window.removeEventListener('wheel', handleScroll);
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
       window.removeEventListener('resize', resizeHandler);
       cancelAnimationFrame(animationFrameRef.current);
     };
   }, []);
 
   return (
-    <div style={{ height: '100vh', position: 'relative' }}>
+    <div style={{ height: '100vh', position: 'relative', touchAction: 'none' }}>
       <canvas
         ref={canvasRef}
         style={{
